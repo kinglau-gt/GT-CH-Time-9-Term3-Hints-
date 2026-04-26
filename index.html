@@ -35,8 +35,6 @@
             font-size: 0.95rem; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: background 0.3s, border 0.3s;
         }
         .item::before { content: "⋮⋮"; margin-right: 12px; color: #ccc; }
-
-        /* 💡 新增：鎖定正確項目的外觀 */
         .item.correct-glow { 
             background: #d4edda !important; 
             border-color: #28a745 !important; 
@@ -49,7 +47,6 @@
         #submit-btn { background: var(--primary); margin-top: 15px; }
         #feedback { text-align: center; margin-top: 8px; font-weight: bold; height: 1.2em; font-size: 0.9rem; }
 
-        /* 通關畫面 */
         #overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(135deg, #2c3e50 0%, #000000 100%);
@@ -75,6 +72,12 @@
         .rank-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ddd; padding: 3px 0; color: #555; }
         .rank-row:last-child { border: none; }
         .current-rank { color: #fff !important; font-weight: bold; background: var(--success); border-radius: 4px; padding: 2px 6px; }
+        
+        /* 輸入框樣式優化 */
+        .input-style { 
+            padding: 10px; border-radius: 20px; border: 1px solid #ccc; width: 80%; 
+            margin-bottom: 8px; text-align: center; font-size: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -86,19 +89,31 @@
         <div class="score-big" id="final-score">0</div>
         <div class="rank-badge" id="rank-text">-</div>
         
-        <div class="rank-table">
+        <div id="standard-rank-table" class="rank-table">
             <div class="rank-row" id="r1"><span>💎 穿越過去的人</span> <span>1350+</span></div>
             <div class="rank-row" id="r2"><span>🔥 史學大宗師</span> <span>1250+</span></div>
             <div class="rank-row" id="r3"><span>📜 歷史系教授</span> <span>1150+</span></div>
             <div class="rank-row" id="r4"><span>✍️ 中史科老師</span> <span>1050+</span></div>
             <div class="rank-row" id="r5"><span>🧭 5星星考生</span> <span>950+</span></div>
             <div class="rank-row" id="r6"><span>🔍 合格線上的學生</span> <span>850+</span></div>
-            <div class="rank-row" id="r7"><span>👤 歷史課打瞌睡專業戶</span> <span>750+</span></div>
+            <div class="rank-row" id="r7"><span>👤 歷史課打瞌睡專家</span> <span>750+</span></div>
             <div class="rank-row" id="r8"><span>🐣 以為溥儀是女性的人</span> <span><750</span></div>
-
         </div>
-        
-        <button class="btn" style="background:var(--success); width:auto; padding:10px 30px; margin-top:10px; font-size:1rem;" onclick="location.reload()">再戰一次</button>
+
+        <div id="action-area" style="margin-top: 15px;">
+            <div id="name-input-group">
+                <select id="player-class" class="input-style">
+                    <option value="">--- 選擇班別 ---</option>
+                    <option value="G9A">G9A</option><option value="G9B">G9B</option>
+                    <option value="G9C">G9C</option><option value="G9D">G9D</option>
+                    <option value="G9E">G9E</option><option value="G9F">G9F</option>
+                </select>
+                <input type="text" id="player-name" placeholder="輸入你的姓名..." class="input-style">
+                <button id="sync-btn" class="btn" style="background:var(--accent); width:auto; padding:8px 25px; margin-top:8px; font-size:1rem;" 
+                        onclick="saveScore()">提交紀錄並同步</button>
+            </div>
+            <button id="restart-btn" class="btn" style="background:var(--success); width:auto; padding:10px 30px; margin-top:10px; font-size:1rem; display:none;" onclick="location.reload()">再戰一次</button>
+        </div>
     </div>
 </div>
 
@@ -133,6 +148,9 @@
 </div>
 
 <script>
+// --- 重要：在此貼上您的 Google Web App URL ---
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwm2WYIGa0AxO-DtjduN7YS3f94Z3h2cRySJQlGSj8rLxokciKLqPfUGsx7njEq8M84yA/exec"; 
+
 const masterDatabase = [
     "國民黨成立", "宋教仁案", "善後大借款", "二次革命", "袁世凱當選正式大總統", "中華革命黨成立", "日本對德宣戰", "《二十一條》", "籌安會成立", "新文化運動開始",
     "洪憲帝制", "護國之役", "府院之爭", "張勳復辟", "護法之役", "中國對德宣戰(加入一戰)", "十月革命", "《山東換文》", "巴黎和會", "五四運動", "中國國民黨成立",
@@ -150,9 +168,19 @@ const masterDatabase = [
 ];
 
 let score = 0, level = 1, startTime, timerRunning = false, correctIds = [], currentLevelBase = 40;
-const audio = new (window.AudioContext || window.webkitAudioContext)();
+let audio;
+
+function initAudio() {
+    try {
+        if (!audio) {
+            audio = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audio.state === 'suspended') audio.resume();
+    } catch(e) { console.log("Audio not supported"); }
+}
 
 function beep(f, t, d) {
+    if (!audio || audio.state !== 'running') return;
     try {
         const o = audio.createOscillator(), g = audio.createGain();
         o.type = t; o.frequency.value = f; o.connect(g); g.connect(audio.destination);
@@ -163,6 +191,7 @@ function beep(f, t, d) {
 function startGame() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('game-screen').style.display = 'block';
+    initAudio();
     startLevel();
 }
 
@@ -196,8 +225,8 @@ function startLevel() {
         forceFallback: true,   
         fallbackTolerance: 3,  
         delay: 0,              
-        touchStartThreshold: 0,
-     });
+        touchStartThreshold: 0
+    });
 
     startTime = Date.now();
     timerRunning = true;
@@ -207,8 +236,11 @@ function startLevel() {
 function updateTimer() {
     if (!timerRunning) return;
     const now = (Date.now() - startTime) / 1000;
-    document.getElementById('timer').innerText = now.toFixed(1) + "s";
-    requestAnimationFrame(updateTimer);
+    const timerEl = document.getElementById('timer');
+    if (timerEl) {
+        timerEl.innerText = now.toFixed(1) + "s";
+        requestAnimationFrame(updateTimer);
+    }
 }
 
 document.getElementById('submit-btn').addEventListener('click', () => {
@@ -216,35 +248,32 @@ document.getElementById('submit-btn').addEventListener('click', () => {
     const userOrder = [...items].map(li => parseInt(li.dataset.id));
     let allCorrect = true;
 
-    // 💡 自動鎖定邏輯：逐一比對位置
     userOrder.forEach((id, index) => {
         if (id === correctIds[index]) {
             items[index].classList.add('correct-glow');
         } else {
             allCorrect = false;
             items[index].classList.remove('correct-glow');
-            }
+        }
     });
 
     if (allCorrect) {
         timerRunning = false;
         const timeUsed = (Date.now() - startTime) / 1000;
-        
-        // 💡 嚴格獎勵邏輯：必須「首發全對」且「極速」才有 Bonus
         let bonus = 0;
         if (currentLevelBase === 40) { 
-            // 只有未曾扣分的情況下，才根據時間給予獎勵
             bonus = (timeUsed <= 8) ? 30 : (timeUsed <= 15) ? 15 : (timeUsed <= 25) ? 5 : 0;
-        } else {
-            // 只要按錯過一次，該關最高分就是 currentLevelBase (30, 20...)，無速度加成
-            bonus = 0;
         }
         
         score += (currentLevelBase + bonus);
         document.getElementById('score-num').innerText = score;
         beep(880, 'sine', 0.5);
         document.getElementById('feedback').innerHTML = `<span style="color:var(--success)">✅ 正確！得到 ${currentLevelBase + bonus} 分</span>`;
-        setTimeout(() => { document.getElementById('feedback').innerText = ""; level++; startLevel(); }, 1000);
+        setTimeout(() => { 
+            document.getElementById('feedback').innerText = ""; 
+            level++; 
+            startLevel(); 
+        }, 800);
     } else {
         beep(200, 'square', 0.2);
         currentLevelBase = Math.max(0, currentLevelBase - 10);
@@ -264,11 +293,15 @@ function finishGame() {
     else if (score >= 1050) { rank = "✍️ 中史科老師"; activeId = "r4"; }
     else if (score >= 950) { rank = "🧭 5星星考生"; activeId = "r5"; }
     else if (score >= 850) { rank = "🔍 合格線上的學生"; activeId = "r6"; }
-    else if (score >= 750) { rank = "👤 歷史課打瞌睡專業戶"; activeId = "r7"; }
+    else if (score >= 750) { rank = "👤 歷史課打瞌睡專家"; activeId = "r7"; }
     
     document.getElementById('rank-text').innerText = rank;
     document.querySelectorAll('.rank-row').forEach(el => el.classList.remove('current-rank'));
     document.getElementById(activeId).classList.add('current-rank');
+
+    // 載入上次填寫的資訊
+    if(localStorage.getItem('saved_class')) document.getElementById('player-class').value = localStorage.getItem('saved_class');
+    if(localStorage.getItem('saved_name')) document.getElementById('player-name').value = localStorage.getItem('saved_name');
 }
 
 function animateScore(s, e, d) {
@@ -296,6 +329,34 @@ function initParticles() {
         if(document.getElementById('overlay').classList.contains('show')) requestAnimationFrame(draw);
     }
     draw();
+}
+
+function saveScore() {
+    const classVal = document.getElementById('player-class').value;
+    const nameVal = document.getElementById('player-name').value.trim();
+    
+    if (!classVal || !nameVal) return alert("請完整填寫班別與姓名！");
+
+    // 儲存到本地，下次不用重複填
+    localStorage.setItem('saved_class', classVal);
+    localStorage.setItem('saved_name', nameVal);
+
+    const btn = document.getElementById('sync-btn');
+    btn.innerText = "同步中..."; btn.disabled = true;
+
+    // 傳送到 Google Sheets
+    fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({ className: classVal, name: nameVal, score: score })
+    }).then(() => {
+        alert("紀錄已成功同步至老師的雲端表格！");
+        document.getElementById('name-input-group').style.display = 'none';
+        document.getElementById('restart-btn').style.display = 'inline-block';
+    }).catch(e => {
+        alert("同步失敗，請檢查網路！");
+        btn.innerText = "提交紀錄並同步"; btn.disabled = false;
+    });
 }
 </script>
 </body>
