@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>優才歷史時序王 - G9 Term 3</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50; --accent: #e67e22; --success: #27ae60; --danger: #e74c3c; 
+            --gold: #f1c40f; --panel-bg: rgba(255, 255, 255, 0.95);
+        }
+        body { 
+            font-family: 'PingFang HK', 'Microsoft JhengHei', sans-serif; 
+            background: #cdb4db; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh;
+            touch-action: manipulation; overflow: hidden;
+        }
+        .game-container {
+            background: white; width: 92%; max-width: 480px; padding: 25px; border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15); position: relative; z-index: 10;
+        }
+        #start-screen, #game-screen { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        #game-screen { display: none; }
+        .logo { font-size: 4rem; margin-bottom: 10px; animation: floating 3s ease-in-out infinite; }
+        @keyframes floating { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .rule-box { background: #f8f9fa; padding: 15px; border-radius: 15px; text-align: left; margin: 15px 0; width: 100%; font-size: 0.85rem; line-height: 1.5; }
+        .status-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; width: 100%;}
+        .stat-box { background: #f8f9fa; padding: 8px 12px; border-radius: 10px; font-weight: bold; font-size: 0.8rem; }
+        .timer-display { font-size: 1.6rem; color: var(--accent); font-family: monospace; font-weight: bold; }
+        #sortable-list { list-style: none; padding: 0; margin: 0; width: 100%; user-select: none; }
+        
+        .item { 
+            background: white; border: 2px solid #eee; margin-bottom: 8px; padding: 12px; 
+            border-radius: 12px; font-weight: 600; cursor: grab; display: flex; align-items: center;
+            font-size: 0.95rem; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: background 0.3s, border 0.3s;
+        }
+        .item::before { content: "⋮⋮"; margin-right: 12px; color: #ccc; }
+
+        /* 💡 新增：鎖定正確項目的外觀 */
+        .item.correct-glow { 
+            background: #d4edda !important; 
+            border-color: #28a745 !important; 
+            color: #155724; 
+        }
+        .item.correct-glow:before { content: "✅"; color: #28a745; }
+
+        .btn { width: 100%; padding: 16px; border: none; border-radius: 50px; color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-start { background: var(--success); }
+        #submit-btn { background: var(--primary); margin-top: 15px; }
+        #feedback { text-align: center; margin-top: 8px; font-weight: bold; height: 1.2em; font-size: 0.9rem; }
+
+        /* 通關畫面 */
+        #overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #2c3e50 0%, #000000 100%);
+            flex-direction: column; justify-content: center; align-items: center; z-index: 100;
+            opacity: 0; transition: opacity 0.8s ease;
+        }
+        #overlay.show { opacity: 1; display: flex; }
+        #particle-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .result-card {
+            background: var(--panel-bg); width: 88%; max-width: 420px; padding: 20px; 
+            border-radius: 30px; text-align: center; position: relative; z-index: 2;
+            box-shadow: 0 20px 60px rgba(241, 196, 15, 0.3); border: 3px solid var(--gold);
+            transform: scale(0.8); transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #overlay.show .result-card { transform: scale(1); }
+        .score-big { font-size: 3.5rem; color: var(--accent); margin: 0; font-weight: 800; font-family: monospace; }
+        .rank-badge { background: var(--gold); color: #fff; padding: 6px 20px; border-radius: 50px; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; display: inline-block; }
+        
+        .rank-table { 
+            background: rgba(0,0,0,0.05); border-radius: 12px; padding: 10px; 
+            text-align: left; font-size: 0.72rem; line-height: 1.3;
+        }
+        .rank-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ddd; padding: 3px 0; color: #555; }
+        .rank-row:last-child { border: none; }
+        .current-rank { color: #fff !important; font-weight: bold; background: var(--success); border-radius: 4px; padding: 2px 6px; }
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <canvas id="particle-canvas"></canvas>
+    <div class="result-card">
+        <h2 style="margin:0; color:var(--primary);">📜 修復成果</h2>
+        <div class="score-big" id="final-score">0</div>
+        <div class="rank-badge" id="rank-text">-</div>
+        
+        <div class="rank-table">
+            <div class="rank-row" id="r1"><span>💎 穿越過去的人</span> <span>1350+</span></div>
+            <div class="rank-row" id="r2"><span>🔥 史學大宗師</span> <span>1250+</span></div>
+            <div class="rank-row" id="r3"><span>📜 歷史系教授</span> <span>1150+</span></div>
+            <div class="rank-row" id="r4"><span>✍️ 中史科老師</span> <span>1050+</span></div>
+            <div class="rank-row" id="r5"><span>🧭 5星星考生</span> <span>950+</span></div>
+            <div class="rank-row" id="r6"><span>🔍 合格線上的學生</span> <span>850+</span></div>
+            <div class="rank-row" id="r7"><span>👤 歷史課打瞌睡專業戶</span> <span>750+</span></div>
+            <div class="rank-row" id="r8"><span>🐣 以為溥儀是女性的人</span> <span><750</span></div>
+
+        </div>
+        
+        <button class="btn" style="background:var(--success); width:auto; padding:10px 30px; margin-top:10px; font-size:1rem;" onclick="location.reload()">再戰一次</button>
+    </div>
+</div>
+
+<div class="game-container">
+    <div id="start-screen">
+        <div class="logo">⏳</div>
+        <h1 style="color:var(--primary); margin:0; font-size: 1.8rem;"> 優才書院<br> 歷史時序王<br></h1>
+        <p style="color:#7f8c8d; font-size: 0.9rem;">修復 <b>1911-1997年</b> 混亂的時空線！</p>
+        <div class="rule-box">
+             <b>🕹️ 玩法：</b> 手指拖動事件，按時間先後排列。<br>
+             <b>🏆 關卡：</b>挑戰共 20 關，每關隨機抽取 5 個歷史事件。<br>
+             <b>💡 幫助：</b>提交後，<b>正確的項目會自動鎖定</b>，助你推理。<br>
+             <b>🏆 得分：</b>每關 40 分。排錯一次扣 10 分。<br>
+              <b>⚡ 極速獎勵：</b><br>
+            • 8 秒內完成：<b>+30 分</b><br>
+            • 15 秒內完成：<b>+15 分</b><br>
+            • 25 秒內完成：<b>+5 分</b><br>
+          </div>
+        <button class="btn btn-start" onclick="startGame()">開始挑戰</button>
+    </div>
+
+    <div id="game-screen">
+        <div class="status-bar">
+            <div class="stat-box">Level: <span id="lv-num">1</span>/20</div>
+            <div class="timer-display" id="timer">0.0s</div>
+            <div class="stat-box">Score: <span id="score-num">0</span></div>
+        </div>
+        <ul id="sortable-list"></ul>
+        <div id="feedback"></div>
+        <button id="submit-btn" class="btn">提交排序</button>
+    </div>
+</div>
+
+<script>
+const masterDatabase = [
+    "國民黨成立", "宋教仁案", "善後大借款", "二次革命", "袁世凱當選正式大總統", "中華革命黨成立", "日本對德宣戰", "《二十一條》", "籌安會成立", "新文化運動開始",
+    "洪憲帝制", "護國之役", "府院之爭", "張勳復辟", "護法之役", "中國對德宣戰(加入一戰)", "十月革命", "《山東換文》", "巴黎和會", "五四運動", "中國國民黨成立",
+    "機器工人罷工", "中國共產黨成立", "華盛頓會議", "海員大罷工", "沙田慘案", "孫文越飛宣言", "黃埔軍校成立", "孫中山病逝", "五卅慘案", "省港大罷工",
+    "沙基慘案", "廣州國民政府成立", "中山艦事件", "國民黨北伐", "南京事件", "四一二事件", "寧漢分裂", "南昌起義", "秋收起事", "寧漢復合",
+    "田中奏摺", "濟南慘案(五三慘案)", "皇姑屯事件", "東北易幟", "經濟大蕭條", "威海衛回歸", "九一八事變", "中華蘇維埃共和國成立", "一二八事變", "偽滿洲國成立", "《淞滬停戰協定》",
+     "日本出兵熱河", "《塘沽協定》","五次圍攻蘇區", "二萬五千里長征", "遵義會議", "冀東防共自治政府成立", "西安事變", "盧溝橋事變(七七事變)", "廬山講話",
+    "共赴國難宣言", "八一三之役", "平型關大捷", "四行倉庫保衛戰", "南京大屠殺", "台兒莊大捷", "武漢會戰", "二戰爆發", "偽國民政府成立",  "英國封鎖滇緬公路","百團大戰",
+    "皖南事變", "《日蘇中立條約》", "日本偷襲珍珠港", "入緬戰爭", "中途島海戰", "《雅爾達密約》", "原子彈投廣島、長崎", "蘇聯對日宣戰", "日本無條件投降", "重慶和談", "《雙十協定》", "馬歇爾來華",
+    "國共停戰協定", "延安失陷", "遼瀋戰役", "淮海戰役", "平津戰役", "中華人民共和國成立", "《中蘇友好同盟互助條約》", "土地改革運動", "鎮壓反革命運動", "抗美援朝", "思想改造運動",
+    "三反五反運動", "第一個五年計劃", "萬隆會議", "赫魯曉夫清算史太林", "鳴放運動", "反右運動", "三面紅旗", "金門炮戰", "廬山會議", "反右傾運動",
+    "三年困難時期", "「三自一包」", "抗美援越", "評新編歷史劇海瑞罷官", "五一六通知", "炮打司令部", "一月風暴", "三砸一燒", "上山下鄉", "珍寶島事件", "乒乓外交",
+    "基辛格訪華", "九一三事件", "中國恢復聯合國席位", "尼克遜訪華", "田中角榮訪華", "批林批孔運動", "反擊右傾翻案風", "四五天安門事件", "四人幫被捕",
+    "十一屆三中全會", "中美建交", "麥理浩訪華", "戴卓爾夫人訪華", "《中英聯合聲明》", "基本法草委會成立", "香港回歸"
+];
+
+let score = 0, level = 1, startTime, timerRunning = false, correctIds = [], currentLevelBase = 40;
+const audio = new (window.AudioContext || window.webkitAudioContext)();
+
+function beep(f, t, d) {
+    try {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = t; o.frequency.value = f; o.connect(g); g.connect(audio.destination);
+        o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + d); o.stop(audio.currentTime + d);
+    } catch(e){}
+}
+
+function startGame() {
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'block';
+    startLevel();
+}
+
+function startLevel() {
+    if (level > 20) return finishGame();
+    document.getElementById('lv-num').innerText = level;
+    currentLevelBase = 40; 
+    
+    let randomIndices = [];
+    while(randomIndices.length < 5) {
+        let r = Math.floor(Math.random() * masterDatabase.length);
+        if(!randomIndices.includes(r)) randomIndices.push(r);
+    }
+    
+    correctIds = [...randomIndices].sort((a, b) => a - b);
+    let displayItems = randomIndices.map(idx => ({ id: idx, text: masterDatabase[idx] }));
+    displayItems.sort(() => Math.random() - 0.5);
+
+    const list = document.getElementById('sortable-list');
+    list.innerHTML = "";
+    displayItems.forEach(i => {
+        const li = document.createElement('li');
+        li.className = 'item'; li.dataset.id = i.id; li.innerText = i.text;
+        list.appendChild(li);
+    });
+
+    if (window.gameSortable) window.gameSortable.destroy(); 
+    
+    window.gameSortable = new Sortable(list, { 
+        animation: 200,
+        forceFallback: true,   
+        fallbackTolerance: 3,  
+        delay: 0,              
+        touchStartThreshold: 0,
+     });
+
+    startTime = Date.now();
+    timerRunning = true;
+    updateTimer();
+}
+
+function updateTimer() {
+    if (!timerRunning) return;
+    const now = (Date.now() - startTime) / 1000;
+    document.getElementById('timer').innerText = now.toFixed(1) + "s";
+    requestAnimationFrame(updateTimer);
+}
+
+document.getElementById('submit-btn').addEventListener('click', () => {
+    const items = document.querySelectorAll('.item');
+    const userOrder = [...items].map(li => parseInt(li.dataset.id));
+    let allCorrect = true;
+
+    // 💡 自動鎖定邏輯：逐一比對位置
+    userOrder.forEach((id, index) => {
+        if (id === correctIds[index]) {
+            items[index].classList.add('correct-glow');
+        } else {
+            allCorrect = false;
+            items[index].classList.remove('correct-glow');
+            }
+    });
+
+    if (allCorrect) {
+        timerRunning = false;
+        const timeUsed = (Date.now() - startTime) / 1000;
+        
+        // 💡 嚴格獎勵邏輯：必須「首發全對」且「極速」才有 Bonus
+        let bonus = 0;
+        if (currentLevelBase === 40) { 
+            // 只有未曾扣分的情況下，才根據時間給予獎勵
+            bonus = (timeUsed <= 8) ? 30 : (timeUsed <= 15) ? 15 : (timeUsed <= 25) ? 5 : 0;
+        } else {
+            // 只要按錯過一次，該關最高分就是 currentLevelBase (30, 20...)，無速度加成
+            bonus = 0;
+        }
+        
+        score += (currentLevelBase + bonus);
+        document.getElementById('score-num').innerText = score;
+        beep(880, 'sine', 0.5);
+        document.getElementById('feedback').innerHTML = `<span style="color:var(--success)">✅ 正確！得到 ${currentLevelBase + bonus} 分</span>`;
+        setTimeout(() => { document.getElementById('feedback').innerText = ""; level++; startLevel(); }, 1000);
+    } else {
+        beep(200, 'square', 0.2);
+        currentLevelBase = Math.max(0, currentLevelBase - 10);
+        document.getElementById('feedback').innerHTML = `<span style="color:var(--danger)">❌ 部分順序有誤，已鎖定正確項目！</span>`;
+    }
+});
+
+function finishGame() {
+    document.getElementById('overlay').classList.add('show');
+    initParticles();
+    animateScore(0, score, 2000);
+    
+     let rank = "🐣 以為溥儀是女性的人", activeId = "r8";
+     if (score >= 1350) { rank = "💎 穿越過去的人"; activeId = "r1"; }
+    else if (score >= 1250) { rank = "🔥 史學大宗師"; activeId = "r2"; }
+    else if (score >= 1150) { rank = "📜 歷史系教授"; activeId = "r3"; }
+    else if (score >= 1050) { rank = "✍️ 中史科老師"; activeId = "r4"; }
+    else if (score >= 950) { rank = "🧭 5星星考生"; activeId = "r5"; }
+    else if (score >= 850) { rank = "🔍 合格線上的學生"; activeId = "r6"; }
+    else if (score >= 750) { rank = "👤 歷史課打瞌睡專業戶"; activeId = "r7"; }
+    
+    document.getElementById('rank-text').innerText = rank;
+    document.querySelectorAll('.rank-row').forEach(el => el.classList.remove('current-rank'));
+    document.getElementById(activeId).classList.add('current-rank');
+}
+
+function animateScore(s, e, d) {
+    const obj = document.getElementById("final-score");
+    let st = null;
+    function step(ts) {
+        if (!st) st = ts;
+        const pr = Math.min((ts - st) / d, 1);
+        obj.innerText = Math.floor(pr * (e - s) + s);
+        if (pr < 1) requestAnimationFrame(step);
+        else obj.innerText = e;
+    }
+    requestAnimationFrame(step);
+}
+
+function initParticles() {
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    let p = [];
+    for (let i = 0; i < 50; i++) p.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*3+1, c:`rgba(241,196,15,${Math.random()*0.5+0.2})`, s:Math.random()*1+0.5});
+    function draw() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        p.forEach(i => { ctx.beginPath(); ctx.arc(i.x, i.y, i.r, 0, Math.PI*2); ctx.fillStyle=i.c; ctx.fill(); i.y -= i.s; if(i.y < -10) i.y = canvas.height + 10; });
+        if(document.getElementById('overlay').classList.contains('show')) requestAnimationFrame(draw);
+    }
+    draw();
+}
+</script>
+</body>
+</html>
