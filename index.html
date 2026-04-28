@@ -27,24 +27,28 @@
         .status-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; width: 100%;}
         .stat-box { background: #f8f9fa; padding: 8px 12px; border-radius: 10px; font-weight: bold; font-size: 0.8rem; }
         .timer-display { font-size: 1.6rem; color: var(--accent); font-family: monospace; font-weight: bold; }
-        #sortable-list { list-style: none; padding: 0; margin: 0; width: 100%; user-select: none; }
         
+        #sortable-list { list-style: none; padding: 0; margin: 0; width: 100%; user-select: none; }
         .item { 
             background: white; border: 2px solid #eee; margin-bottom: 8px; padding: 12px; 
             border-radius: 12px; font-weight: 600; cursor: grab; display: flex; align-items: center;
-            font-size: 0.95rem; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: background 0.3s, border 0.3s;
+            font-size: 0.95rem; box-shadow: 0 2px 5px rgba(0,0,0,0.02);
         }
-        .item::before { content: "⋮⋮"; margin-right: 12px; color: #ccc; }
-        .item.correct-glow { 
-            background: #d4edda !important; 
-            border-color: #28a745 !important; 
-            color: #155724; 
-        }
+        .item::before { content: "⋮⋮"; margin-right: 12px; color: #ccc; flex-shrink: 0; }
+        
+        /* 年份樣式 - 答對後才顯示 */
+        .year-text { color: var(--accent); font-weight: bold; margin-left: auto; display: none; font-family: monospace; font-size: 0.85rem; }
+        .show-year .year-text { display: inline; }
+        
+        .item.correct-glow { background: #d4edda !important; border-color: #28a745 !important; color: #155724; }
         .item.correct-glow:before { content: "✅"; color: #28a745; }
 
         .btn { width: 100%; padding: 16px; border: none; border-radius: 50px; color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-start { background: var(--success); }
         #submit-btn { background: var(--primary); margin-top: 15px; }
+        #next-btn { background: var(--success); margin-top: 15px; display: none; }
+        #auto-timer { font-size: 0.9rem; font-weight: normal; opacity: 0.8; }
+        
         #feedback { text-align: center; margin-top: 8px; font-weight: bold; height: 1.2em; font-size: 0.9rem; }
 
         #overlay {
@@ -65,19 +69,10 @@
         .score-big { font-size: 3.5rem; color: var(--accent); margin: 0; font-weight: 800; font-family: monospace; }
         .rank-badge { background: var(--gold); color: #fff; padding: 6px 20px; border-radius: 50px; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; display: inline-block; }
         
-        .rank-table { 
-            background: rgba(0,0,0,0.05); border-radius: 12px; padding: 10px; 
-            text-align: left; font-size: 0.72rem; line-height: 1.3;
-        }
+        .rank-table { background: rgba(0,0,0,0.05); border-radius: 12px; padding: 10px; text-align: left; font-size: 0.72rem; line-height: 1.3; }
         .rank-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ddd; padding: 3px 0; color: #555; }
-        .rank-row:last-child { border: none; }
         .current-rank { color: #fff !important; font-weight: bold; background: var(--success); border-radius: 4px; padding: 2px 6px; }
-        
-        /* 輸入框樣式優化 */
-        .input-style { 
-            padding: 10px; border-radius: 20px; border: 1px solid #ccc; width: 80%; 
-            margin-bottom: 8px; text-align: center; font-size: 1rem;
-        }
+        .input-style { padding: 10px; border-radius: 20px; border: 1px solid #ccc; width: 80%; margin-bottom: 8px; text-align: center; font-size: 1rem; }
     </style>
 </head>
 <body>
@@ -89,18 +84,18 @@
         <div class="score-big" id="final-score">0</div>
         <div class="rank-badge" id="rank-text">-</div>
         
-        <div id="standard-rank-table" class="rank-table">
-            <div class="rank-row" id="r1"><span>💎 時空穿越者</span> <span>1350+</span></div>
+        <div class="rank-table">
+            <div class="rank-row" id="r1"><span>💎 清朝穿越者</span> <span>1350+</span></div>
             <div class="rank-row" id="r2"><span>🔥 史學大宗師</span> <span>1250+</span></div>
             <div class="rank-row" id="r3"><span>📜 歷史系教授</span> <span>1150+</span></div>
             <div class="rank-row" id="r4"><span>✍️ 中史科老師</span> <span>1050+</span></div>
             <div class="rank-row" id="r5"><span>🧭 5星星考生</span> <span>950+</span></div>
             <div class="rank-row" id="r6"><span>🔍 合格線上的學生</span> <span>850+</span></div>
             <div class="rank-row" id="r7"><span>👤 歷史課打瞌睡專家</span> <span>750+</span></div>
-            <div class="rank-row" id="r8"><span>🐣 以為溥儀是女性的人</span> <span><750</span></div>
+            <div class="rank-row" id="r8"><span>🐣 以為溥儀是女性的人</span> <span>&lt;750</span></div>
         </div>
 
-        <div id="action-area" style="margin-top: 15px;">
+        <div style="margin-top: 15px;">
             <div id="name-input-group">
                 <select id="player-class" class="input-style">
                     <option value="">--- 選擇班別 ---</option>
@@ -109,8 +104,7 @@
                     <option value="G9E">G9E</option><option value="G9F">G9F</option>
                 </select>
                 <input type="text" id="player-name" placeholder="輸入你的姓名..." class="input-style">
-                <button id="sync-btn" class="btn" style="background:var(--accent); width:auto; padding:8px 25px; margin-top:8px; font-size:1rem;" 
-                        onclick="saveScore()">提交紀錄並同步</button>
+                <button id="sync-btn" class="btn" style="background:var(--accent); width:auto; padding:8px 25px; margin-top:8px; font-size:1rem;" onclick="saveScore()">提交紀錄並同步</button>
             </div>
             <button id="restart-btn" class="btn" style="background:var(--success); width:auto; padding:10px 30px; margin-top:10px; font-size:1rem; display:none;" onclick="location.reload()">再戰一次</button>
         </div>
@@ -120,18 +114,18 @@
 <div class="game-container">
     <div id="start-screen">
         <div class="logo">⏳</div>
-        <h1 style="color:var(--primary); margin:0; font-size: 1.8rem;"> 優才書院<br> 歷史時序王<br></h1>
-        <p style="color:#7f8c8d; font-size: 0.9rem;">修復 <b>1912-1997年</b> 混亂的時空線！</p>
+        <h1 style="color:var(--primary); margin:0; font-size: 1.8rem;">優才書院<br>歷史時序王</h1>
+        <p style="color:#7f8c8d; font-size: 0.9rem;">修復 <b>1912-1997年</b> 混亂的時空線，成為大史學家！</p>
         <div class="rule-box">
              <b>🕹️ 玩法：</b> 手指拖動事件，按時間先後排列。<br>
              <b>🏆 關卡：</b>挑戰共 20 關，每關隨機抽取 5 個歷史事件。<br>
              <b>💡 幫助：</b>提交後，<b>正確的項目會自動鎖定</b>，助你推理。<br>
              <b>🏆 得分：</b>每關 40 分。排錯一次扣 10 分。<br>
-              <b>⚡ 極速獎勵(只有首發全對才有啊)：</b><br>
+             <b>⚡ 極速獎勵(只有首發全對才有啊)：</b><br>
             • 8 秒內完成：<b>+30 分</b><br>
             • 15 秒內完成：<b>+15 分</b><br>
             • 25 秒內完成：<b>+5 分</b><br>
-          </div>
+        </div>
         <button class="btn btn-start" onclick="startGame()">開始挑戰</button>
     </div>
 
@@ -144,89 +138,160 @@
         <ul id="sortable-list"></ul>
         <div id="feedback"></div>
         <button id="submit-btn" class="btn">提交排序</button>
+        <button id="next-btn" class="btn" onclick="clearAutoNext(); nextLevel();">下一關 <span id="auto-timer"></span></button>
     </div>
 </div>
 
 <script>
-// --- 重要：在此貼上您的 Google Web App URL ---
+// 請更換為您的 Google Script URL
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwm2WYIGa0AxO-DtjduN7YS3f94Z3h2cRySJQlGSj8rLxokciKLqPfUGsx7njEq8M84yA/exec"; 
 
 const masterDatabase = [
-    "國民黨成立", "宋教仁案", "善後大借款", "二次革命", "袁世凱當選正式大總統", "中華革命黨成立", "日本對德宣戰", "《二十一條》", "籌安會成立", "新文化運動開始",
-    "洪憲帝制", "護國之役", "府院之爭", "張勳復辟", "護法之役", "中國對德宣戰(加入一戰)", "十月革命", "《山東換文》", "巴黎和會", "五四運動", "中國國民黨成立",
-    "機器工人罷工", "中國共產黨成立", "華盛頓會議", "海員大罷工", "沙田慘案", "孫文越飛宣言", "黃埔軍校成立", "孫中山病逝", "五卅慘案", "省港大罷工",
-    "沙基慘案", "廣州國民政府成立", "中山艦事件", "國民黨北伐", "南京事件", "四一二事件", "寧漢分裂", "南昌起義", "秋收起事", "寧漢復合",
-    "田中奏摺", "濟南慘案(五三慘案)", "皇姑屯事件", "東北易幟", "經濟大蕭條", "威海衛回歸", "九一八事變", "中華蘇維埃共和國成立", "一二八事變", "偽滿洲國成立", "《淞滬停戰協定》",
-     "日本出兵熱河", "《塘沽協定》","五次圍攻蘇區", "二萬五千里長征", "遵義會議", "冀東防共自治政府成立", "西安事變", "盧溝橋事變(七七事變)", "廬山講話",
-    "共赴國難宣言", "八一三之役", "平型關大捷", "四行倉庫保衛戰", "南京大屠殺", "台兒莊大捷", "武漢會戰", "二戰爆發", "偽國民政府成立",  "英國封鎖滇緬公路","百團大戰",
-    "皖南事變", "《日蘇中立條約》", "日本偷襲珍珠港", "入緬戰爭", "中途島海戰", "《雅爾達密約》", "原子彈投廣島、長崎", "蘇聯對日宣戰", "日本無條件投降", "重慶和談", "《雙十協定》", "馬歇爾來華",
-    "國共停戰協定", "延安失陷", "遼瀋戰役", "淮海戰役", "平津戰役", "中華人民共和國成立", "《中蘇友好同盟互助條約》", "土地改革運動", "鎮壓反革命運動", "抗美援朝", "思想改造運動",
-    "三反五反運動", "第一個五年計劃", "萬隆會議", "赫魯曉夫清算史太林", "鳴放運動", "反右運動", "三面紅旗", "金門炮戰", "廬山會議", "反右傾運動",
-    "三年困難時期", "「三自一包」", "抗美援越", "評新編歷史劇海瑞罷官", "五一六通知", "炮打司令部", "一月風暴", "三砸一燒", "上山下鄉", "珍寶島事件", "乒乓外交",
-    "基辛格訪華", "九一三事件", "中國恢復聯合國席位", "尼克遜訪華", "田中角榮訪華", "批林批孔運動", "反擊右傾翻案風", "四五天安門事件", "四人幫被捕",
-    "十一屆三中全會", "中美建交", "麥理浩訪華", "戴卓爾夫人訪華", "《中英聯合聲明》", "基本法草委會成立", "香港回歸"
+    {text:"國民黨成立", year:1912.08}, {text:"宋教仁案", year:1913.03},
+    {text:"善後大借款", year:1913.04}, {text:"二次革命", year:1913.07},
+    {text:"袁世凱當選正式大總統", year:1913.10}, {text:"中華革命黨成立", year:1914.07},
+    {text:"日本對德宣戰", year:1914.08}, {text:"《二十一條》", year:1915.05},
+    {text:"籌安會成立", year:1915.08}, {text:"新文化運動開始", year:1915.09},
+    {text:"洪憲帝制", year:1915.1212}, {text:"護國之役", year:1915.1225},
+    {text:"府院之爭", year:1917.03}, {text:"張勳復辟", year:1917.0701},
+    {text:"護法之役", year:1917.0717}, {text:"中國對德宣戰(加入一戰)", year:1917.08},
+    {text:"十月革命", year:1917.11}, {text:"《山東換文》", year:1918.09},
+    {text:"巴黎和會", year:1919.01}, {text:"五四運動", year:1919.05},
+    {text:"中國國民黨成立", year:1919.10}, {text:"機器工人罷工", year:1920.03},
+    {text:"中國共產黨成立", year:1921.07}, {text:"華盛頓會議", year:1921.11},
+    {text:"海員大罷工", year:1922.01}, {text:"沙田慘案", year:1922.03},
+    {text:"孫文越飛宣言", year:1923.01}, {text:"黃埔軍校成立", year:1924.06},
+    {text:"孫中山病逝", year:1925.03}, {text:"五卅慘案", year:1925.05},
+    {text:"省港大罷工", year:1925.0619}, {text:"沙基慘案", year:1925.0623},
+    {text:"廣州國民政府成立", year:1925.07}, {text:"中山艦事件", year:1926.03},
+    {text:"國民黨北伐", year:1926.07}, {text:"南京事件", year:1927.03},
+    {text:"四一二事件", year:1927.0412}, {text:"寧漢分裂", year:1927.0417}, 
+    {text:"田中奏摺", year:1927.07}, {text:"南昌起義", year:1927.08}, 
+    {text:"秋收起事", year:1927.0909}, {text:"寧漢復合", year:1927.0920},
+    {text:"濟南慘案(五三慘案)", year:1928.05}, {text:"皇姑屯事件", year:1928.06},
+    {text:"東北易幟", year:1928.12}, {text:"經濟大蕭條", year:1929.10},
+    {text:"威海衛回歸", year:1930.1001}, {text:"五次圍攻蘇區", year:1930.1005}, 
+    {text:"九一八事變", year:1931.09}, {text:"中華蘇維埃共和國成立", year:1931.11}, 
+    {text:"一二八事變", year:1932.01}, {text:"偽滿洲國成立", year:1932.03}, 
+    {text:"《淞滬停戰協定》", year:1932.05}, {text:"日本出兵熱河", year:1933.02}, 
+    {text:"《塘沽協定》", year:1933.05}, {text:"二萬五千里長征", year:1934.10},
+    {text:"遵義會議", year:1935.01}, {text:"冀東防共自治政府成立", year:1935.11},
+    {text:"西安事變", year:1936.12}, {text:"盧溝橋事變(七七事變)", year:1937.0707},
+    {text:"《共赴國難宣言》", year:1937.0715}, {text:"廬山講話", year:1937.0717},
+    {text:"八一三之役", year:1937.08}, {text:"平型關大捷", year:1937.09},
+    {text:"四行倉庫保衛戰", year:1937.10}, {text:"南京大屠殺", year:1937.12},
+    {text:"台兒莊大捷", year:1938.04}, {text:"武漢會戰", year:1938.06},
+    {text:"二戰爆發", year:1939.09}, {text:"偽國民政府成立", year:1940.03},
+    {text:"英國封鎖滇緬公路", year:1940.07}, {text:"百團大戰", year:1940.08},
+    {text:"皖南事變", year:1941.01}, {text:"《日蘇中立條約》", year:1941.04},
+    {text:"日本偷襲珍珠港", year:1941.12}, {text:"入緬戰爭", year:1942.03},
+    {text:"中途島海戰", year:1942.06}, {text:"《雅爾達密約》", year:1945.02},
+    {text:"原子彈投廣島、長崎", year:1945.0806}, {text:"蘇聯對日宣戰", year:1945.0808},
+    {text:"日本無條件投降", year:1945.0815}, {text:"重慶和談", year:1945.0829},
+    {text:"《雙十協定》", year:1945.10}, {text:"馬歇爾來華", year:1945.12},
+    {text:"國共停戰協定", year:1946.01}, {text:"延安失陷", year:1947.03},
+    {text:"遼瀋戰役", year:1948.09}, {text:"淮海戰役", year:1948.11},
+    {text:"平津戰役", year:1948.12}, {text:"中華人民共和國成立", year:1949.10},
+    {text:"《中蘇友好互助條約》", year:1950.02}, {text:"土地改革運動", year:1950.06},
+    {text:"抗美援朝", year:1950.10}, {text:"鎮壓反革命運動", year:1950.12}, 
+    {text:"思想改造運動", year:1951.09}, {text:"三反五反運動", year:1951.12}, 
+    {text:"第一個五年計劃", year:1953.01}, {text:"萬隆會議", year:1955.04}, 
+    {text:"赫魯曉夫清算史太林", year:1956.02}, {text:"鳴放運動", year:1957.04}, 
+    {text:"反右運動", year:1957.06}, {text:"三面紅旗", year:1958.05}, 
+    {text:"金門炮戰", year:1958.08}, {text:"三年困難時期", year:1959.01},
+    {text:"廬山會議", year:1959.07}, {text:"反右傾運動", year:1959.08},
+    {text:"三自一包", year:1962.09}, {text:"抗美援越", year:1965.04},
+    {text:"評新編歷史劇海瑞罷官", year:1965.11}, {text:"五一六通知", year:1966.05}, 
+    {text:"《炮打司令部》", year:1966.08}, {text:"一月風暴", year:1967.01},
+    {text:"三砸一燒", year:1967.06}, {text:"上山下鄉", year:1968.12}, 
+    {text:"珍寶島事件", year:1969.03}, {text:"乒乓外交", year:1971.04},
+    {text:"基辛格訪華", year:1971.07}, {text:"九一三事件", year:1971.09},
+    {text:"中國恢復聯合國席位", year:1971.10}, {text:"尼克遜訪華", year:1972.02},
+    {text:"田中角榮訪華", year:1972.09}, {text:"批林批孔運動", year:1974.01}, 
+    {text:"反擊右傾翻案風", year:1975.11}, {text:"四五天安門事件", year:1976.04}, 
+    {text:"四人幫被捕", year:1976.10}, {text:"十一屆三中全會", year:1978.12}, 
+    {text:"中美建交", year:1979.01}, {text:"麥理浩訪華", year:1979.03}, 
+    {text:"戴卓爾夫人訪華", year:1982.09}, {text:"《中英聯合聲明》", year:1984.12}, 
+    {text:"基本法草委會成立", year:1985.07}, {text:"香港回歸", year:1997.07}
 ];
 
-let score = 0, level = 1, startTime, timerRunning = false, correctIds = [], currentLevelBase = 40;
+
+
+let score = 0, level = 1, startTime, timerRunning = false, correctOrder = [], currentLevelBase = 40, autoNextInterval;
 let audio;
 
 function initAudio() {
-    try {
-        if (!audio) {
-            audio = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audio.state === 'suspended') audio.resume();
-    } catch(e) { console.log("Audio not supported"); }
+    try { if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch(e) {}
 }
-
 function beep(f, t, d) {
     if (!audio || audio.state !== 'running') return;
-    try {
-        const o = audio.createOscillator(), g = audio.createGain();
-        o.type = t; o.frequency.value = f; o.connect(g); g.connect(audio.destination);
-        o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + d); o.stop(audio.currentTime + d);
-    } catch(e){}
+    try { const o = audio.createOscillator(), g = audio.createGain(); o.type = t; o.frequency.value = f; o.connect(g); g.connect(audio.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + d); o.stop(audio.currentTime + d); } catch(e){}
+}
+
+// 新增功能：將小數格式化為年月日字串
+function formatYearString(val) {
+    // 強制保留 4 位小數並轉為字串，避免 1843.10 變成 1843.1
+    // 使用 .replace(/0+$/, '') 是為了去掉末尾多餘的 0，但我們需要先處理月份
+    let s = val.toFixed(4); 
+    let parts = s.split('.');
+    let year = parts[0] + "年";
+    
+    if (!parts[1] || parseInt(parts[1]) === 0) return year;
+
+    // 抓取前兩位作為月份
+    let monthStr = parts[1].substring(0, 2);
+    let month = parseInt(monthStr);
+    
+    // 抓取後兩位作為日期
+    let dayStr = parts[1].substring(2, 4);
+    let day = parseInt(dayStr);
+
+    let result = year + month + "月";
+    if (day > 0) result += day + "日";
+    
+    return result;
 }
 
 function startGame() {
     document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'block';
+    document.getElementById('game-screen').style.display = 'flex';
     initAudio();
     startLevel();
 }
 
 function startLevel() {
     if (level > 20) return finishGame();
+    clearAutoNext();
     document.getElementById('lv-num').innerText = level;
+    document.getElementById('game-screen').classList.remove('show-year'); // 每關開始隱藏年份
+    document.getElementById('submit-btn').style.display = 'block';
+    document.getElementById('next-btn').style.display = 'none';
+    document.getElementById('feedback').innerText = "";
     currentLevelBase = 40; 
     
-    let randomIndices = [];
-    while(randomIndices.length < 5) {
-        let r = Math.floor(Math.random() * masterDatabase.length);
-        if(!randomIndices.includes(r)) randomIndices.push(r);
+    let selected = [];
+    let tempDb = [...masterDatabase];
+    for(let i=0; i<5; i++) {
+        let r = Math.floor(Math.random() * tempDb.length);
+        selected.push(tempDb.splice(r, 1)[0]);
     }
     
-    correctIds = [...randomIndices].sort((a, b) => a - b);
-    let displayItems = randomIndices.map(idx => ({ id: idx, text: masterDatabase[idx] }));
-    displayItems.sort(() => Math.random() - 0.5);
+    correctOrder = [...selected].sort((a, b) => a.year - b.year);
+    let displayItems = [...selected].sort(() => Math.random() - 0.5);
 
     const list = document.getElementById('sortable-list');
     list.innerHTML = "";
     displayItems.forEach(i => {
         const li = document.createElement('li');
-        li.className = 'item'; li.dataset.id = i.id; li.innerText = i.text;
+        li.className = 'item'; 
+        li.dataset.year = i.year; 
+        // 重點修改：將格式化後的完整日期存入 year-text
+        li.innerHTML = `${i.text} <span class="year-text">(${formatYearString(i.year)})</span>`;
         list.appendChild(li);
     });
 
     if (window.gameSortable) window.gameSortable.destroy(); 
-    
-    window.gameSortable = new Sortable(list, { 
-        animation: 200,
-        forceFallback: true,   
-        fallbackTolerance: 3,  
-        delay: 0,              
-        touchStartThreshold: 0
-    });
+    window.gameSortable = new Sortable(list, { animation: 200 });
 
     startTime = Date.now();
     timerRunning = true;
@@ -236,20 +301,17 @@ function startLevel() {
 function updateTimer() {
     if (!timerRunning) return;
     const now = (Date.now() - startTime) / 1000;
-    const timerEl = document.getElementById('timer');
-    if (timerEl) {
-        timerEl.innerText = now.toFixed(1) + "s";
-        requestAnimationFrame(updateTimer);
-    }
+    document.getElementById('timer').innerText = now.toFixed(1) + "s";
+    requestAnimationFrame(updateTimer);
 }
 
 document.getElementById('submit-btn').addEventListener('click', () => {
     const items = document.querySelectorAll('.item');
-    const userOrder = [...items].map(li => parseInt(li.dataset.id));
+    const userYears = [...items].map(li => parseFloat(li.dataset.year));
     let allCorrect = true;
 
-    userOrder.forEach((id, index) => {
-        if (id === correctIds[index]) {
+    userYears.forEach((y, index) => {
+        if (y === correctOrder[index].year) {
             items[index].classList.add('correct-glow');
         } else {
             allCorrect = false;
@@ -259,6 +321,9 @@ document.getElementById('submit-btn').addEventListener('click', () => {
 
     if (allCorrect) {
         timerRunning = false;
+        beep(880, 'sine', 0.5);
+        document.getElementById('game-screen').classList.add('show-year'); // 全對後顯示年份
+        
         const timeUsed = (Date.now() - startTime) / 1000;
         let bonus = 0;
         if (currentLevelBase === 40) { 
@@ -267,13 +332,21 @@ document.getElementById('submit-btn').addEventListener('click', () => {
         
         score += (currentLevelBase + bonus);
         document.getElementById('score-num').innerText = score;
-        beep(880, 'sine', 0.5);
-        document.getElementById('feedback').innerHTML = `<span style="color:var(--success)">✅ 正確！得到 ${currentLevelBase + bonus} 分</span>`;
-        setTimeout(() => { 
-            document.getElementById('feedback').innerText = ""; 
-            level++; 
-            startLevel(); 
-        }, 800);
+        
+        let msg = bonus > 0 ? `🔥 極速獎勵！得到 ${currentLevelBase + bonus} 分` : `✅ 正確！得到 ${currentLevelBase} 分`;
+        document.getElementById('feedback').innerHTML = `<span style="color:var(--success)">${msg}</span>`;
+        
+        document.getElementById('submit-btn').style.display = 'none';
+        document.getElementById('next-btn').style.display = 'block';
+        window.gameSortable.option("disabled", true);
+
+        let timeLeft = 10;
+        document.getElementById('auto-timer').innerText = `(${timeLeft}s)`;
+        autoNextInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('auto-timer').innerText = `(${timeLeft}s)`;
+            if (timeLeft <= 0) { clearAutoNext(); nextLevel(); }
+        }, 1000);
     } else {
         beep(200, 'square', 0.2);
         currentLevelBase = Math.max(0, currentLevelBase - 10);
@@ -281,13 +354,16 @@ document.getElementById('submit-btn').addEventListener('click', () => {
     }
 });
 
+function clearAutoNext() { if (autoNextInterval) clearInterval(autoNextInterval); }
+function nextLevel() { level++; startLevel(); }
+
 function finishGame() {
     document.getElementById('overlay').classList.add('show');
     initParticles();
     animateScore(0, score, 2000);
     
-     let rank = "🐣 以為溥儀是女性的人", activeId = "r8";
-     if (score >= 1350) { rank = "💎 時空穿越者"; activeId = "r1"; }
+    let rank = "🐣 以為溥儀是女性的人", activeId = "r8";
+    if (score >= 1350) { rank = "💎 清朝穿越者"; activeId = "r1"; }
     else if (score >= 1250) { rank = "🔥 史學大宗師"; activeId = "r2"; }
     else if (score >= 1150) { rank = "📜 歷史系教授"; activeId = "r3"; }
     else if (score >= 1050) { rank = "✍️ 中史科老師"; activeId = "r4"; }
@@ -299,7 +375,6 @@ function finishGame() {
     document.querySelectorAll('.rank-row').forEach(el => el.classList.remove('current-rank'));
     document.getElementById(activeId).classList.add('current-rank');
 
-    // 載入上次填寫的資訊
     if(localStorage.getItem('saved_class')) document.getElementById('player-class').value = localStorage.getItem('saved_class');
     if(localStorage.getItem('saved_name')) document.getElementById('player-name').value = localStorage.getItem('saved_name');
 }
@@ -334,29 +409,14 @@ function initParticles() {
 function saveScore() {
     const classVal = document.getElementById('player-class').value;
     const nameVal = document.getElementById('player-name').value.trim();
-    
     if (!classVal || !nameVal) return alert("請完整填寫班別與姓名！");
-
-    // 儲存到本地，下次不用重複填
     localStorage.setItem('saved_class', classVal);
     localStorage.setItem('saved_name', nameVal);
-
     const btn = document.getElementById('sync-btn');
     btn.innerText = "同步中..."; btn.disabled = true;
-
-    // 傳送到 Google Sheets
-    fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify({ className: classVal, name: nameVal, score: score })
-    }).then(() => {
-        alert("紀錄已成功同步至老師的雲端表格！");
-        document.getElementById('name-input-group').style.display = 'none';
-        document.getElementById('restart-btn').style.display = 'inline-block';
-    }).catch(e => {
-        alert("同步失敗，請檢查網路！");
-        btn.innerText = "提交紀錄並同步"; btn.disabled = false;
-    });
+    fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ className: classVal, name: nameVal, score: score }) })
+    .then(() => { alert("紀錄已成功同步！"); document.getElementById('name-input-group').style.display = 'none'; document.getElementById('restart-btn').style.display = 'inline-block'; })
+    .catch(() => { alert("同步失敗！"); btn.innerText = "提交紀錄並同步"; btn.disabled = false; });
 }
 </script>
 </body>
